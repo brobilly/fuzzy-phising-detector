@@ -61,7 +61,9 @@ def has_unicode(url):
     return 1 if urlparse(url).netloc.startswith("xn--") else 0
 
 def count_numbers(url):
-    return sum(c.isdigit() for c in url)
+    parsed = urlparse(url)
+    domain = parsed.netloc
+    return sum(c.isdigit() for c in domain)
 
 def domainAge(domain_name):
     try:
@@ -103,7 +105,7 @@ def featureExtraction(url):
         feature_dict = {
             'Uses_HTTPS': uses_https(url),
             'URL_tld': is_suspicious_tld(url),
-            'URL_Length': getLength(url),
+            #'URL_Length': getLength(url),
             'URL_Depth': getDepth(url),
             'TinyURL': tinyURL(url),
             'Prefix/Suffix': prefixSuffix(url),
@@ -223,7 +225,7 @@ def fuzzy_score(row, url=''):
 
     # Breakdown dictionary
     breakdown = {
-        'URL_Length': row['URL_Length'],
+        #'URL_Length': row['URL_Length'],
         'URL_Depth': row['URL_Depth'],
         'No_Of_Dots': row['No_Of_Dots'],
         'Have_Symbol': row['Have_Symbol'],
