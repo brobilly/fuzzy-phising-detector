@@ -123,7 +123,7 @@ def featureExtraction(url):
 # --- [Fuzzy Inference System] ---
 def fuzzy_score(row, url=''):
     # Define fuzzy variables
-    url_length = ctrl.Antecedent(np.arange(0, 101, 1), 'url_length')
+    # url_length = ctrl.Antecedent(np.arange(0, 101, 1), 'url_length')
     url_depth = ctrl.Antecedent(np.arange(0, 10, 1), 'url_depth')
     dots = ctrl.Antecedent(np.arange(0, 10, 1), 'dots')
     symbols = ctrl.Antecedent(np.arange(0, 4, 1), 'symbols')
@@ -140,9 +140,9 @@ def fuzzy_score(row, url=''):
     risk = ctrl.Consequent(np.arange(0, 101, 1), 'risk')
 
     # Membership Functions
-    url_length['short'] = fuzz.trimf(url_length.universe, [0, 0, 50])
-    url_length['medium'] = fuzz.trimf(url_length.universe, [30, 60, 90])
-    url_length['long'] = fuzz.trimf(url_length.universe, [70, 100, 100])
+    # url_length['short'] = fuzz.trimf(url_length.universe, [0, 0, 50])
+    # url_length['medium'] = fuzz.trimf(url_length.universe, [30, 60, 90])
+    # url_length['long'] = fuzz.trimf(url_length.universe, [70, 100, 100])
 
     url_depth['shallow'] = fuzz.trimf(url_depth.universe, [0, 0, 3])
     url_depth['medium'] = fuzz.trimf(url_depth.universe, [2, 4, 6])
@@ -188,11 +188,11 @@ def fuzzy_score(row, url=''):
 
     # Fuzzy rules (expand as needed)
     rules = [
-        ctrl.Rule(url_length['long'] | dots['many'] | num_count['high'], risk['high']),
+        ctrl.Rule(dots['many'] | num_count['high'], risk['high']),
         ctrl.Rule(symbols['many'] | redirects['high'], risk['high']),
         ctrl.Rule(domain_age['young'] | domain_end['soon'], risk['high']),
         ctrl.Rule(url_depth['deep'] & dots['many'], risk['medium']),
-        ctrl.Rule(url_length['short'] & symbols['none'] & redirects['low'] & domain_age['old'], risk['low']),
+        ctrl.Rule(symbols['none'] & redirects['low'] & domain_age['old'], risk['low']),
         ctrl.Rule(https['no'], risk['medium']),
         ctrl.Rule(tinyurl['yes'] | prefix_suffix['yes'], risk['medium']),
         ctrl.Rule(tld_suspicious['yes'], risk['high']),
@@ -203,7 +203,7 @@ def fuzzy_score(row, url=''):
     sim = ctrl.ControlSystemSimulation(control_system)
 
     # Masukkan input dari fitur hasil ekstraksi
-    sim.input['url_length'] = row['URL_Length']
+    # sim.input['url_length'] = row['URL_Length']
     sim.input['url_depth'] = row['URL_Depth']
     sim.input['dots'] = row['No_Of_Dots']
     sim.input['symbols'] = row['Have_Symbol']
