@@ -25,7 +25,7 @@ def is_suspicious_tld(url):
         "support", "fit", "loan", "download", "men",
         "review", "date", "party", "trade", "stream",
         "gdn", "win", "accountant", "science", "racing",
-        "buzz", "icu", "wang", "live", "host", "info"
+        "buzz", "icu", "wang", "live", "host", "info", "lat"
     }
     try:
         netloc = urlparse(url).netloc.split(':')[0]
@@ -96,29 +96,6 @@ def final_url_differs(url):
         return 1 if str(r.url) != url else 0
     except:
         return 1
-
-def featureExtraction(url):
-    try:
-        domain = urlparse(url).netloc
-        feature_dict = {
-            'Uses_HTTPS': uses_https(url),
-            'URL_tld': is_suspicious_tld(url),
-            'URL_Length': getLength(url),
-            'URL_Depth': getDepth(url),
-            'TinyURL': tinyURL(url),
-            'Prefix/Suffix': prefixSuffix(url),
-            'No_Of_Dots': no_of_dots(url),
-            'Domain_Age': domainAge(domain),
-            'Domain_End': domainEnd(domain),
-            'Have_Symbol': has_unicode(url) + haveAtSign(url) + havingIP(url),
-            'Redirect_Count': redirect_count(url),
-            'Final_URL_Differs': final_url_differs(url),
-            'Num_Count': count_numbers(url)
-        }
-        return pd.DataFrame([feature_dict])
-    except Exception as e:
-        print("Error extracting features:", e)
-        return pd.DataFrame()
     
 def featureExtraction(url):
     try:
@@ -154,10 +131,15 @@ def fuzzy_score(row, url=''):
     domain_age = ctrl.Antecedent(np.arange(0, 1001, 1), 'domain_age')
     domain_end = ctrl.Antecedent(np.arange(0, 366, 1), 'domain_end')
     num_count = ctrl.Antecedent(np.arange(0, 15, 1), 'num_count')
+    https = ctrl.Antecedent(np.arange(0, 2, 1), 'https')
+    tinyurl = ctrl.Antecedent(np.arange(0, 2, 1), 'tinyurl')
+    prefix_suffix = ctrl.Antecedent(np.arange(0, 2, 1), 'prefix_suffix')
+    tld_suspicious = ctrl.Antecedent(np.arange(0, 2, 1), 'tld_suspicious')
+    final_url_diff = ctrl.Antecedent(np.arange(0, 2, 1), 'final_url_diff')
 
     risk = ctrl.Consequent(np.arange(0, 101, 1), 'risk')
 
-    # Stricter Membership Functions
+    # Membership Functions
     url_length['short'] = fuzz.trimf(url_length.universe, [0, 0, 50])
     url_length['medium'] = fuzz.trimf(url_length.universe, [30, 60, 90])
     url_length['long'] = fuzz.trimf(url_length.universe, [70, 100, 100])
@@ -185,23 +167,42 @@ def fuzzy_score(row, url=''):
     num_count['low'] = fuzz.trimf(num_count.universe, [0, 0, 3])
     num_count['high'] = fuzz.trimf(num_count.universe, [3, 10, 14])
 
+    https['no'] = fuzz.trimf(https.universe, [0, 0, 0])
+    https['yes'] = fuzz.trimf(https.universe, [1, 1, 1])
+
+    tinyurl['no'] = fuzz.trimf(tinyurl.universe, [0, 0, 0])
+    tinyurl['yes'] = fuzz.trimf(tinyurl.universe, [1, 1, 1])
+
+    prefix_suffix['no'] = fuzz.trimf(prefix_suffix.universe, [0, 0, 0])
+    prefix_suffix['yes'] = fuzz.trimf(prefix_suffix.universe, [1, 1, 1])
+
+    tld_suspicious['no'] = fuzz.trimf(tld_suspicious.universe, [0, 0, 0])
+    tld_suspicious['yes'] = fuzz.trimf(tld_suspicious.universe, [1, 1, 1])
+
+    final_url_diff['no'] = fuzz.trimf(final_url_diff.universe, [0, 0, 0])
+    final_url_diff['yes'] = fuzz.trimf(final_url_diff.universe, [1, 1, 1])
+
     risk['low'] = fuzz.trimf(risk.universe, [0, 0, 30])
     risk['medium'] = fuzz.trimf(risk.universe, [20, 50, 70])
     risk['high'] = fuzz.trimf(risk.universe, [60, 100, 100])
 
-    # Fuzzy rules (simplified — adjust as needed)
+    # Fuzzy rules (expand as needed)
     rules = [
         ctrl.Rule(url_length['long'] | dots['many'] | num_count['high'], risk['high']),
         ctrl.Rule(symbols['many'] | redirects['high'], risk['high']),
         ctrl.Rule(domain_age['young'] | domain_end['soon'], risk['high']),
         ctrl.Rule(url_depth['deep'] & dots['many'], risk['medium']),
         ctrl.Rule(url_length['short'] & symbols['none'] & redirects['low'] & domain_age['old'], risk['low']),
+        ctrl.Rule(https['no'], risk['medium']),
+        ctrl.Rule(tinyurl['yes'] | prefix_suffix['yes'], risk['medium']),
+        ctrl.Rule(tld_suspicious['yes'], risk['high']),
+        ctrl.Rule(final_url_diff['yes'], risk['medium']),
     ]
 
     control_system = ctrl.ControlSystem(rules)
     sim = ctrl.ControlSystemSimulation(control_system)
 
-    # Input actual values
+    # Masukkan input dari fitur hasil ekstraksi
     sim.input['url_length'] = row['URL_Length']
     sim.input['url_depth'] = row['URL_Depth']
     sim.input['dots'] = row['No_Of_Dots']
@@ -210,12 +211,17 @@ def fuzzy_score(row, url=''):
     sim.input['domain_age'] = row['Domain_Age']
     sim.input['domain_end'] = row['Domain_End']
     sim.input['num_count'] = row['Num_Count']
+    sim.input['https'] = row['Uses_HTTPS']
+    sim.input['tinyurl'] = row['TinyURL']
+    sim.input['prefix_suffix'] = row['Prefix/Suffix']
+    sim.input['tld_suspicious'] = row['URL_tld']
+    sim.input['final_url_diff'] = row['Final_URL_Differs']
 
     sim.compute()
     fuzzy_val = sim.output['risk']
     score = round(fuzzy_val / 100.0, 3)
 
-    # Optional: explain feature contributions (approx)
+    # Breakdown dictionary
     breakdown = {
         'URL_Length': row['URL_Length'],
         'URL_Depth': row['URL_Depth'],
@@ -224,7 +230,12 @@ def fuzzy_score(row, url=''):
         'Redirect_Count': row['Redirect_Count'],
         'Domain_Age': row['Domain_Age'],
         'Domain_End': row['Domain_End'],
-        'Num_Count': row['Num_Count']
+        'Num_Count': row['Num_Count'],
+        'Uses_HTTPS': row['Uses_HTTPS'],
+        'TinyURL': row['TinyURL'],
+        'Prefix/Suffix': row['Prefix/Suffix'],
+        'URL_tld': row['URL_tld'],
+        'Final_URL_Differs': row['Final_URL_Differs']
     }
 
     return score, breakdown
